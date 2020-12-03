@@ -11,9 +11,9 @@ class C2S {
 	 * Initialize the class, registering WordPress hooks
 	 */
 	public static function init() {
-		\add_filter( 'manage_activitypub_posts_columns', array( '\Activitypub\C2S', 'activitypub_posts_columns' ), 10 );
-		\add_filter( 'manage_activitypub_posts_sortable_columns', array( '\Activitypub\C2S', 'activitypub_posts_sortable_columns' ), 10 );
-		\add_filter( 'manage_activitypub_posts_custom_column', array( '\Activitypub\C2S', 'activitypub_posts_custom_columns' ), 20, 2 );
+		\add_filter( 'manage_mention_posts_columns', array( '\Activitypub\C2S', 'activitypub_posts_columns' ), 10 );
+		\add_filter( 'manage_mention_posts_sortable_columns', array( '\Activitypub\C2S', 'activitypub_posts_sortable_columns' ), 10 );
+		\add_filter( 'manage_mention_posts_custom_column', array( '\Activitypub\C2S', 'activitypub_posts_custom_columns' ), 20, 2 );
 		\add_filter( 'page_row_actions', array( '\Activitypub\C2S', 'activitypub_post_row_actions' ), 10, 2 );
 		\add_action( 'load-edit.php', array( '\Activitypub\C2S', 'activitypub_post_actions') );
 		\add_filter( 'wp_revisions_to_keep', array( '\Activitypub\C2S', 'activitypub_inbox_revisions' ), 10, 2 );
