@@ -41,13 +41,31 @@ class Activity_Dispatcher {
 	}
 
 	/**
+	 * Send "create" activities.
+	 *
+	 * @param \Activitypub\Model\Post $activitypub_post
+	 */
+	public static function send_private_activity( $activitypub_post ) {
+		// get latest version of post
+		$user_id = $activitypub_post->get_post_author();
+
+		$activitypub_activity = new \Activitypub\Model\Activity( 'Create', \Activitypub\Model\Activity::TYPE_FULL );
+		$activitypub_activity->from_post( $activitypub_post->to_array() );
+
+		foreach ( \Activitypub\get_follower_inboxes( $user_id ) as $inbox => $to ) {
+			$activitypub_activity->set_to( $to );
+			$activity = $activitypub_activity->to_json(); // phpcs:ignore
+			//\Activitypub\safe_remote_post( $inbox, $activity, $user_id );
+		}
+	}
+	/**
 	 * Send "update" activities.
 	 *
 	 * @param \Activitypub\Model\Post $activitypub_post
 	 */
 	public static function send_update_activity( $activitypub_post ) {
 		// get latest version of post
-		$user_id = $activitypub_post->post_author;
+		$user_id = $activitypub_post->get_post_author();
 
 		$activitypub_activity = new \Activitypub\Model\Activity( 'Update', \Activitypub\Model\Activity::TYPE_FULL );
 		$activitypub_activity->from_post( $activitypub_post->to_array() );
@@ -67,7 +85,7 @@ class Activity_Dispatcher {
 	 */
 	public static function send_delete_activity( $activitypub_post ) {
 		// get latest version of post
-		$user_id = $activitypub_post->post_author;
+		$user_id = $activitypub_post->get_post_author();
 
 		$activitypub_activity = new \Activitypub\Model\Activity( 'Delete', \Activitypub\Model\Activity::TYPE_FULL );
 		$activitypub_activity->from_post( $activitypub_post->to_array() );
@@ -86,7 +104,7 @@ class Activity_Dispatcher {
 	 * @param \Activitypub\Model\Comment $activitypub_comment
 	 */
 	public static function send_comment_activity( $activitypub_comment_id ) {
-		//ONLY FOR LOCAL USERS ?
+		// ONLY FOR LOCAL USERS ?
 		$activitypub_comment = \get_comment( $activitypub_comment_id );
 		$user_id =  $activitypub_comment->user_id;
 		$replyto = get_comment_meta( $activitypub_comment->comment_parent, 'comment_author_url', true );//
