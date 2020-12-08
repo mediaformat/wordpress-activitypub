@@ -60,7 +60,7 @@
 							<?php \esc_html_e( 'Enable ActivityPub support for the following post types:', 'activitypub' ); ?>
 
 							<?php $post_types = \get_post_types( array( 'public' => true ), 'objects' ); ?>
-							<?php $support_post_types = \get_option( 'activitypub_support_post_types', array( 'post', 'page' ) ) ? \get_option( 'activitypub_support_post_types', array( 'post', 'page' ) ) : array(); ?>
+							<?php $support_post_types = \get_option( 'activitypub_support_post_types', array( 'post', 'page', 'mention' ) ) ? \get_option( 'activitypub_support_post_types', array( 'post', 'page', 'mention' ) ) : array(); ?>
 							<ul>
 							<?php foreach ( $post_types as $post_type ) { ?>
 								<li>

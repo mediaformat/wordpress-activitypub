@@ -20,10 +20,6 @@ class Inbox {
 		//\add_action( 'activitypub_inbox_like', array( '\Activitypub\Rest\Inbox', 'handle_reaction' ), 10, 2 );
 		//\add_action( 'activitypub_inbox_announce', array( '\Activitypub\Rest\Inbox', 'handle_reaction' ), 10, 2 );
 		\add_action( 'activitypub_inbox_create', array( '\Activitypub\Rest\Inbox', 'handle_create' ), 10, 2 );
-		
-	//	\add_action( 'pre_get_posts', array( '\Activitypub\Rest\Inbox', 'filter_private_messages' ), 11 );
-	//	\add_action( 'wp_count_comments', array( '\Activitypub\Rest\Inbox', 'count_comments' ), 11, 2 );
-	//	\add_action( 'admin_head', array( '\Activitypub\Rest\Inbox', 'comments_styles' ), 21 );
 	}
 
 	/**
@@ -102,7 +98,6 @@ class Inbox {
 	public static function user_inbox( $request ) {
 		$user_id = $request->get_param( 'user_id' );
 
-//		error_log( 'user_inbox $request: ' . print_r( $request, true ) );
 		$data = $request->get_params();
 		$type = $request->get_param( 'type' );
 
@@ -352,17 +347,14 @@ class Inbox {
 					//replied to a local comment (which has a post_ID)
 					$object_parent = get_comment( $object_parent_ID );
 					$comment_post_ID = $object_parent->comment_post_ID;
+				} else {
+					$object_parent_ID = \Activitypub\url_to_metapostid( \esc_url_raw( $object['object']['inReplyTo'] ) );
 				}
 			}
 		}		
 
-		//not all implementaions use url
-		if ( isset( $object['object']['url'] ) ) {
-			$source_url = \esc_url_raw( $object['object']['url'] );
-		} else {
-			//could also try $object['object']['source']?
-			$source_url = \esc_url_raw( $object['object']['id'] );
-		}
+		// 'id' is referenced by 'inReplyTo'
+		$source_url = \esc_url_raw( $object['object']['id'] );
 
 		// if no name is set use peer username
 		if ( !empty( $meta['name'] ) ) {
@@ -374,19 +366,10 @@ class Inbox {
 		if ( !empty( $meta['icon']['url'] ) ) {
 			$avatar_url = \esc_attr( $meta['icon']['url'] );
 		}
-
-
-		// Check if has Parent(make WP_Comment) or Not(make WP_Post)
-		if ( !empty( $comment_post_ID ) ) {
-
-		}
 		
-		//TODO Then check PUBLIC/PRIVATE (assign comment_tye accordingly)
-		//Only create WP_Comment for public replies to posts
-// ??? Only create comments for public replies to PUBLIC posts
-// ??? Why not private replies to posts (should we manage private comments? [the global comments system])	
-		if ( ( in_array( 'https://www.w3.org/ns/activitystreams#Public', $object['to'] )
-			|| in_array( 'https://www.w3.org/ns/activitystreams#Public', $object['cc'] ) )
+		// Only create WP_Comment for public replies to posts	
+		if ( ( in_array( AS_PUBLIC, $object['to'] )
+			|| in_array( AS_PUBLIC, $object['cc'] ) )
 			&& ( !empty( $comment_post_ID ) 
 			|| !empty ( $object_parent ) 
 			) ) {
@@ -400,8 +383,11 @@ class Inbox {
 				'comment_author_email' => '',
 				'comment_parent' => $object_parent_ID,
 				'comment_meta' => array(
-					'inReplyTo' => \esc_url_raw( $object['object']['inReplyTo'] ),//needed? (if replying to someone else on thread, but not received)non-wp status - comment_post_ID, object_parent
+					'audience' => $audience,
+					'inReplyTo' => \esc_url_raw( $object['object']['inReplyTo'] ),
 					'source_url' => $source_url,
+					'avatar_url' => $avatar_url,
+					'ap_object' => \serialize( $object ),
 					'protocol' => 'activitypub',
 				),
 			);
@@ -413,105 +399,47 @@ class Inbox {
 
 			// re-add flood control
 			\add_action( 'check_comment_flood', 'check_comment_flood_db', 10, 4 );
+			
 
 		} else {
-			//Not a public reply to a public post
+			// Not a public reply to a public post
+			// TODO how to safely handle $object['attachment']?
 			$title = $summary = null;
 			if ( isset( $object['object']['summary'] ) ) {
-				$title = \wp_trim_words( $object['object']['summary'], 10 );
 				$summary = \wp_strip_all_tags( $object['object']['summary'] );
+				$title = \wp_trim_words( $summary, 10 );
 			}
-			$to = get_user_by( 'id', $object['user_id'] );
-			$to_url = get_author_posts_url( $object['user_id'] );
-			error_log( 'inbox:handle_create:to: ' . $to_url );
-			// TODO if empty( $object['object']['summary'] ) trim+filter  $object['object']['content']  
 			$postdata = array(
 				'post_author' => $object['user_id'],
 				'post_content' => \wp_filter_kses( $object['object']['content'] ),
 				'post_title' => $title,
 				'post_excerpt' => $summary,
-				'post_status' => 'inbox',//private
-				'post_type' => 'mention',// . $audience,//activitypub
-				'post_parent' => \esc_url_raw( $object['object']['inReplyTo'] ),
+				'post_status' => 'inbox',
+				'post_type' => 'mention',
+				'post_parent' => $object_parent_ID,
 				'meta_input' => array(
-					'_audience' 	=> $audience,
-					'_ap_object' 	=> \serialize( $object ),
-					'_inreplyto' => \esc_url_raw( $object['object']['inReplyTo'] ),
-					'_author' 		=> $name,
-					'_author_url' 	=> \esc_url_raw( $object['actor'] ),
-					'_source_url' 	=> $source_url,
-					'_avatar_url' 	=> $avatar_url,
-					'_protocol' 	=> 'activitypub',
+					'audience' 	=> $audience,
+					'ap_object' 	=> \serialize( $object ),
+					//'read_status' 	=> 'unread',
+					//'mention_type' => \Activitypub\get_audience( $object['object'] ),
+					'inreplyto'	=> \esc_url_raw( $object['object']['inReplyTo'] ),
+					'author' 		=> $name,
+					'author_url' 	=> \esc_url_raw( $object['actor'] ),
+					'source_url' 	=> $source_url,
+					'avatar_url' 	=> $avatar_url,
+					'protocol' 	=> 'activitypub',
 				),
 			);
 
+			$post_id = \wp_insert_post( $postdata );
+
+			if( !is_wp_error( $post_id ) ) {
+				error_log( $post_id );
+		    	wp_send_json_success( array( 'post_id' => $post_id ), 200 );
 		  } else {
+				error_log( $post_id->get_error_message() );
+		    	wp_send_json_error( $post_id->get_error_message() );
 		  }
 		}
-
 	}
-
-	public static function comments_styles() {
-		echo '<style>';
-		echo '.wp-list-table>tbody>.activitypub_dm{ background: #fcc !important; }';
-		echo '.wp-list-table>tbody>.activitypub_fo{ background: #cfc !important; }';
-		echo '</style>';
-	}
-
-	//\add_action( 'init', '\Activitypub\add_rewrite_rules', 1 );
-	public static function filter_private_messages( $query ) {
-		//make public static constants for public/private comment_types
-
-		//if register setting for public comment moderation or not? if not merge arrays
-		if (is_admin()){
-
-			$current_screen = get_current_screen();
-			if( $current_screen->parent_base === 'edit-comments'){
-				//echo "<details><summary>current_screen</summary><pre>"; print_r( $current_screen ); echo "</pre></details>";
-				//$query->set( 'post_status', 'private_message' );
-				//$query->query_vars['type__not_in'] = $ap_types;
-				//$query->query_vars['type__not_in'] = in_array( $query->query_vars['type__not_in'], $ap_types);
-			}
-		}
-	}
-
-	// public static function count_comments( $count, $post_id ) {
-	// 	$ap_public_comments = array( 'activitypub_ul', 'activitypub' );
-	// 	$ap_private_comments = array( 'activitypub_dm', 'activitypub_fo' );
-	// 	$ap_types = array_merge( $ap_public_comments, $ap_private_comments );
-	// 	$current_screen = get_current_screen();
-	// 	//$comments_count = wp_count_comments();
-	//
-	// 	if( !is_null( $current_screen ) ){
-	// 		if( $current_screen->id === 'edit-comments' ){
-	// 			// echo "<pre> count_comments </pre>";
-	// 			// echo "<pre>"; print_r( $count ); echo "</pre>";
-	// 			//$query->query_vars['type__not_in'] = in_array( $query->query_vars['type__not_in'], $ap_types);
-	// 		}
-	// 	}
-	// 	if ( 0 === $post_id ){
-	// 		var_dump( 'count_comments site' );
-	// 		// echo "<pre>"; print_r( $count ); echo "</pre>";
-	// 	}
-	// }
-
-	// public static function ap_personal_comment_list($clauses){
-	// 	if ( is_admin() ) {
-	// 		global $current_user, $wpdb;
-	// 		$clauses['join'] = "wp_posts";
-	// 		$clauses['where'] .= " AND wp_posts.post_author = ".$current_user->ID." AND wp_comments.comment_post_ID = wp_posts.ID";
-	// 	};
-	// 	return $clauses;
-	// }
-
-
-	
-	// public static function filter_comments( $approved, $data ) {
-	//  /* only allow 'my_custom_comment_type' when is required explicitly */
-	//  //echo "<pre>"; print_r( $query ); echo "</pre>";
-	//  return isset($data['comment_type']) && $data['comment_type'] === 'activitypub_dm'
-	// 	 ? 1
-	// 	 : $approved;
-	// 			//	array( 'activitypub_dm', 'activitypub_fo' )
-	// }
 }

@@ -141,7 +141,7 @@ class Post {
 			}
 		}
 
-		$mention_tags = \get_post_meta( $this->post->ID, '_mentions' );
+		$mention_tags = \get_post_meta( $this->post->ID, 'mentions' );
 		if ( !empty( $mention_tags ) ) {
 			foreach ($mention_tags as $mention) {
 				if ( !empty( $mention ) ) {

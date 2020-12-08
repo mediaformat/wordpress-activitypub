@@ -363,6 +363,30 @@ function url_to_commentid( $comment_url ) {
 	}	
 }
 
+/**
+ * Look for local post->ID from remote URL
+ * 
+ * return int comment_id
+ */
+function url_to_metapostid( $url ) {
+	$post_types = \get_option( 'activitypub_support_post_types' );
+	$post_args = array(
+		'post_type' => $post_types,
+		'meta_key' => '_source_url',
+		'meta_value' => $url,
+		'post_status' => 'any',
+	);
+	$found_posts = get_posts( $post_args );
+	$found_post_ids = array();
+	if ( $found_posts ) {
+		 foreach ( $found_posts as $post ) {
+			 $found_post_ids[] = $post->ID;
+		 }
+		 return $found_post_ids[0];
+	} 
+	return null;
+}
+
 //add recipients to CC 
 function add_recipients( $recipient ) {
 	$cc = array( AS_PUBLIC );
@@ -381,7 +405,7 @@ function get_recipients( $object_id, $post = null ) {
 	$tagged_users_name = null;
 	if ( $post ) {
 		//post
-		$ap_object = \unserialize( \get_post_meta( $object_id, '_ap_object' ) );
+		$ap_object = \unserialize( \get_post_meta( $object_id, 'ap_object', true  ) );
 	} else {
 		//comment
 		$ap_object = \unserialize( \get_comment_meta( $object_id, 'ap_object', true ) );

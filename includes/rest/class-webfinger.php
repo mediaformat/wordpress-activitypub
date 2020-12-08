@@ -15,7 +15,7 @@ class Webfinger {
 	public static function init() {
 		\add_action( 'rest_api_init', array( '\Activitypub\Rest\Webfinger', 'register_routes' ) );
 		\add_action( 'webfinger_user_data', array( '\Activitypub\Rest\Webfinger', 'add_webfinger_discovery' ), 10, 3 );
-		//\add_action( 'webfinger_lookup', array( '\Activitypub\Rest\Webfinger', 'webfinger_lookup' ), 10, 3 );
+		\add_action( 'webfinger_lookup', array( '\Activitypub\Rest\Webfinger', 'webfinger_lookup' ), 10, 3 );
 	}
 
 	/**

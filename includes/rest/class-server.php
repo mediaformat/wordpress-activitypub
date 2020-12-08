@@ -27,16 +27,6 @@ class Server extends \WP_REST_Server {
 		
 		$user_agent = $request->get_header('user_agent');
 		
-		if ( \Activitypub\str_contains( $user_agent, 'MastoPeek') 
-			|| \Activitypub\str_contains( $user_agent, 'Python' ) 
-			|| \Activitypub\str_contains( $user_agent, 'fediverse.space' ) 
-			|| \Activitypub\str_contains( $user_agent, 'Friendica' ) ) {
-			\error_log( 'Crawler: ' . $user_agent );
-			//$request->set_header('HTTP1.1 404 Not Found', true, 404);
-			$request->set_header('Location: https://layer8.space/', true, 301);
-			$request->set_body(null);
-			return new \WP_REST_Response($request, 404);
-		}
 
 		// make request filterable
 		$request = \apply_filters( 'activitypub_pre_dispatch_request', $request );
