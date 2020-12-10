@@ -22,7 +22,7 @@ class Activitypub {
 		}
 		
 		\add_action( 'pre_get_posts', array( '\Activitypub\Activitypub', 'private_inbox' ), 10, 2 );
-		\add_filter( 'status_edit_pre', array( '\Activitypub\Activitypub', 'set_post_type_status_private' ), 10, 2 );
+		//\add_filter( 'status_edit_pre', array( '\Activitypub\Activitypub', 'set_post_type_status_private' ), 10, 2 );
 		\add_action( 'transition_post_status', array( '\Activitypub\Activitypub', 'preprocess_post' ), 1, 3 );
 		\add_action( 'transition_post_status', array( '\Activitypub\Activitypub', 'schedule_post_activity' ), 10, 3 );
 		\add_filter( 'preprocess_comment' , array( '\Activitypub\Activitypub', 'preprocess_comment' ) );

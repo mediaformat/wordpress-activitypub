@@ -264,6 +264,9 @@ class C2S {
 	 * Audience fields 
 	 */
     public static function post_audience_html( $post ) {
+		if ( $post->post_type != 'mention' ) {
+			return;
+		}
 		wp_nonce_field( 'ap_audience_meta', 'ap_audience_meta_nonce' );
 		$audience = $inreplyto = null;
 		if ( isset ( $post->ID ) ) {
@@ -273,16 +276,18 @@ class C2S {
 				$post_parent = $post->post_parent;
 			}
 		}
-		if (array_key_exists('audience', $_REQUEST)) {
-			$audience = $_REQUEST['audience'];
+		if ( isset( $_REQUEST ) ) {
+			if (array_key_exists('audience', $_REQUEST)) {
+				$audience = $_REQUEST['audience'];
+			}
+			if (array_key_exists('post_parent', $_REQUEST)) {
+				$post_parent = $_REQUEST['post_parent'];
+				$inreplyto = get_post_meta( $_REQUEST['post_parent'], 'source_url', true);
+			}
+			if (array_key_exists('comment_parent', $_REQUEST)) {
+				$inreplyto = get_comment_meta( $_REQUEST['comment_parent'], 'source_url', true);
+			}
 		}
-		if (array_key_exists('post_parent', $_REQUEST)) {
-			$post_parent = $_REQUEST['post_parent'];
-			$inreplyto = get_post_meta( $_REQUEST['post_parent'], 'source_url', true);
-		}
-		if (array_key_exists('comment_parent', $_REQUEST)) {
-			$inreplyto = get_comment_meta( $_REQUEST['comment_parent'], 'source_url', true);
-        }
 		?>
 		<style>
 			label {
