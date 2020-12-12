@@ -205,46 +205,48 @@ class C2S {
 	}
 
 	public static function reply_comments_actions( $actions, $comment ) {
-		//unset( $actions['reply'] );
-		$recipients = \Activitypub\get_recipients( $comment->comment_ID );
-		$summary = \Activitypub\get_summary( $comment->comment_ID );
-		$audience = \get_comment_meta( $comment->comment_ID, 'audience', true );
 
-		//TODO revise for non-js reply action
-		// Public Reply
-		$reply_button = '<button type="button" data-comment-id="%d" data-post-id="%d" data-action="%s" class="%s button-link" aria-expanded="false" aria-label="%s" data-recipients="%s" data-summary="%s">%s</button>';
-		$actions['reply'] = sprintf(
-            $reply_button,
-            $comment->comment_ID,
-            $comment->comment_post_ID,
-            'replyto',
-            'vim-r comment-inline',
-			esc_attr__( 'Reply to this comment' ),
-			$recipients,
-			$summary,
-            __( 'Reply', 'activitypub' )
-		);
+		if ( $comment->comment_type == 'activitypub' ) {
 
-		// Block user
-		/*$block_url = admin_url( 'edit.php?post_type=activitypub&post=' . $post->ID );
-		$block_link = wp_nonce_url( add_query_arg( array( 'action' => 'block' ), $block_url ) );
-		$actions = array_merge( $actions, array(
-			'block' => sprintf( '<a href="%1$s" title="%2$s">%3$s</a>',
-					esc_url( $block_link ), 
-					__( 'Block this user', 'activitypub' ),
-					__( 'Block', 'activitypub' )
+			$recipients = \Activitypub\get_recipients( $comment->comment_ID );
+			$summary = \Activitypub\get_summary( $comment->comment_ID );
+			$audience = \get_comment_meta( $comment->comment_ID, 'audience', true );
+	
+			//TODO revise for non-js reply action
+			// Public Reply
+			$reply_button = '<button type="button" data-comment-id="%d" data-post-id="%d" data-action="%s" class="%s button-link" aria-expanded="false" aria-label="%s" data-recipients="%s" data-summary="%s">%s</button>';
+			$actions['reply'] = sprintf(
+				$reply_button,
+				$comment->comment_ID,
+				$comment->comment_post_ID,
+				'replyto',
+				'vim-r comment-inline',
+				esc_attr__( 'Reply to this comment' ),
+				$recipients,
+				$summary,
+				__( 'Reply', 'activitypub' )
+			);
+	
+			// Block user
+			/*$block_url = admin_url( 'edit.php?post_type=activitypub&post=' . $post->ID );
+			$block_link = wp_nonce_url( add_query_arg( array( 'action' => 'block' ), $block_url ) );
+			$actions = array_merge( $actions, array(
+				'block' => sprintf( '<a href="%1$s" title="%2$s">%3$s</a>',
+						esc_url( $block_link ), 
+						__( 'Block this user', 'activitypub' ),
+						__( 'Block', 'activitypub' )
+					) 
 				) 
-			) 
-		);*/
-		
-		// Private reply / New mention
-		$post_url = admin_url( "post-new.php?post_type=mention&comment_parent=$comment->comment_ID&action=private_reply&content=$recipients&post_title=$summary" );
-		$actions['private_reply'] = sprintf( '<a href="%1$s" title="%2$s">%3$s</a>',
-			$post_url,
-			esc_attr__( 'Reply in private to this comment' ),
-            __( 'Private reply', 'activitypub' )
-		);
-
+			);*/
+			
+			// Private reply / New mention
+			$post_url = admin_url( "post-new.php?post_type=mention&comment_parent=$comment->comment_ID&action=private_reply&content=$recipients&post_title=$summary" );
+			$actions['private_reply'] = sprintf( '<a href="%1$s" title="%2$s">%3$s</a>',
+				$post_url,
+				esc_attr__( 'Reply in private to this comment' ),
+				__( 'Private reply', 'activitypub' )
+			);
+		}
 		return $actions;
 	}
 
