@@ -42,16 +42,22 @@ class Activity {
 
 		if ( \strncasecmp( $method, 'set', 3 ) === 0 ) {
 			$this->$var = $params[0];
-			//$this->$var = [ 'https://www.w3.org/ns/activitystreams#Public', $params[0][0]];
 		}
 	}
 
 	public function from_post( $object ) {
 		$this->object = $object;
-		$this->published = $object['published'];
-		$this->actor = $object['attributedTo'];
-		$this->id = $object['id'];
-		$this->cc = array( 'https://www.w3.org/ns/activitystreams#Public', $object['attributedTo'] . 'followers' );
+		if ( isset( $object['published'] ) ) {
+			$this->published = $object['published'];
+		}
+
+		if ( isset( $object['attributedTo'] ) ) {
+			$this->actor = $object['attributedTo'];
+		}
+
+		if ( isset( $object['id'] ) ) {
+			$this->id = $object['id'];
+		}
 	}
 
 	public function from_comment( $object ) {
@@ -61,6 +67,14 @@ class Activity {
 		$this->id = $object['id'] . '-activity';
 		$this->cc = $object['cc'];
 		$this->tag = $object['tag'];
+	}
+
+	public function to_comment() {
+
+	}
+
+	public function from_remote_array( $array ) {
+
 	}
 
 	public function to_array() {
@@ -75,12 +89,16 @@ class Activity {
 		return $array;
 	}
 
+	/**
+	 * Convert to JSON
+	 *
+	 * @return void
+	 */
 	public function to_json() {
 		return \wp_json_encode( $this->to_array(), JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_QUOT );
 	}
 
 	public function to_simple_array() {
-		\error_log( 'to_simple_array' );
 		$activity = array(
 			'@context' => $this->context,
 			'type' => $this->type,

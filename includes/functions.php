@@ -71,7 +71,7 @@ function forward_remote_post( $url, $body, $user_id ) {
 	);
 
 	$response = \wp_safe_remote_post( $url, $args );
-	\error_log( 'forward_remote_post: wp_safe_remote_post: ' . print_r( $response, true ) );
+
 	\do_action( 'activitypub_forward_remote_post_response', $response, $url, $body, $user_id );
 
 	return $response;
