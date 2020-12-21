@@ -16,7 +16,6 @@ class Inbox {
 		\add_action( 'rest_api_init', array( '\Activitypub\Rest\Inbox', 'register_routes' ) );
 		\add_filter( 'rest_pre_serve_request', array( '\Activitypub\Rest\Inbox', 'serve_request' ), 11, 4 );
 		\add_action( 'activitypub_inbox_follow', array( '\Activitypub\Rest\Inbox', 'handle_follow' ), 10, 2 );
-		\add_action( 'activitypub_inbox_unfollow', array( '\Activitypub\Rest\Inbox', 'handle_unfollow' ), 10, 2 );
 		\add_action( 'activitypub_inbox_undo', array( '\Activitypub\Rest\Inbox', 'handle_unfollow' ), 10, 2 );
 		//\add_action( 'activitypub_inbox_like', array( '\Activitypub\Rest\Inbox', 'handle_reaction' ), 10, 2 );
 		//\add_action( 'activitypub_inbox_announce', array( '\Activitypub\Rest\Inbox', 'handle_reaction' ), 10, 2 );
@@ -188,6 +187,9 @@ class Inbox {
 			'required' => true,
 			//'type' => 'enum',
 			//'enum' => array( 'Create' ),
+			'sanitize_callback' => function( $param, $request, $key ) {
+				return \strtolower( $param );
+			},
 		);
 
 		$params['object'] = array(
@@ -230,6 +232,9 @@ class Inbox {
 			'required' => true,
 			//'type' => 'enum',
 			//'enum' => array( 'Create' ),
+			'sanitize_callback' => function( $param, $request, $key ) {
+				return \strtolower( $param );
+			},
 		);
 
 		$params['object'] = array(
@@ -351,7 +356,9 @@ class Inbox {
 	 * @param  int   $user_id The id of the local blog-user
 	 */
 	public static function handle_unfollow( $object, $user_id ) {
-		\Activitypub\Peer\Followers::remove_follower( $object['actor'], $user_id );
+		if ( isset( $object['object'] ) && isset( $object['object']['type'] ) && 'Follow' === $object['object']['type'] ) {
+			\Activitypub\Peer\Followers::remove_follower( $object['actor'], $user_id );
+		}
 	}
 
 	/**
@@ -363,8 +370,15 @@ class Inbox {
 	public static function handle_reaction( $object, $user_id ) {
 		$meta = \Activitypub\get_remote_metadata_by_actor( $object['actor'] );
 
+		$comment_post_id = \url_to_postid( $object['object'] );
+
+		// save only replys and reactions
+		if ( ! $comment_post_id ) {
+			return false;
+		}
+
 		$commentdata = array(
-			'comment_post_ID' => \url_to_postid( $object['object'] ),
+			'comment_post_ID' => $comment_post_id,
 			'comment_author' => \esc_attr( $meta['name'] ),
 			'comment_author_email' => '',
 			'comment_author_url' => \esc_url_raw( $object['actor'] ),
@@ -378,16 +392,12 @@ class Inbox {
 			),
 		);
 
-		// disable flood control
-		\remove_action( 'check_comment_flood', 'check_comment_flood_db', 10 );
-
 		// do not require email for AP entries
-		add_filter( 'pre_option_require_name_email', '__return_false' );
-		$state = \wp_new_comment( $commentdata, true );
-		remove_filter( 'pre_option_require_name_email', '__return_false' );
+		\add_filter( 'pre_option_require_name_email', '__return_false' );
 
-		// re-add flood control
-		\add_action( 'check_comment_flood', 'check_comment_flood_db', 10, 4 );
+		$state = \wp_new_comment( $commentdata, true );
+
+		\remove_filter( 'pre_option_require_name_email', '__return_false' );
 	}
 
 	/**
@@ -446,10 +456,7 @@ class Inbox {
 
 		}
 		
-		//TODO Then check PUBLIC/PRIVATE (assign comment_tye accordingly)
 		//Only create WP_Comment for public replies to posts
-		// ??? Only create comments for public replies to PUBLIC posts
-		// ??? Why not private replies to posts (should we manage private comments? [the global comments system])	
 		if ( ( in_array( 'https://www.w3.org/ns/activitystreams#Public', $object['to'] )
 			|| in_array( 'https://www.w3.org/ns/activitystreams#Public', $object['cc'] ) )
 			&& ( !empty( $comment_post_ID ) 

@@ -42,8 +42,7 @@ class Post {
 		$array = array(
 			'id' => $this->id,
 			'type' => $this->object_type,
-			'published' => \date( 'Y-m-d\TH:i:s\Z', \strtotime( $post->post_date ) ),
-			//'published' => \get_gmt_from_date( \date( 'Y-m-d\TH:i:s\Z', \strtotime( $post->post_date_gmt ) ) ),
+			'published' => \date( 'Y-m-d\TH:i:s\Z', \strtotime( $post->post_date_gmt ) ),
 			'attributedTo' => \get_author_posts_url( $post->post_author ),
 			'summary' => $this->get_the_title(),
 			'inReplyTo' => null,
@@ -142,7 +141,7 @@ class Post {
 		return $images;
 	}
 
-	public function get_tags() {
+	public function generate_tags() {
 		$tags = array();
 
 		$post_tags = \get_the_tags( $this->post->ID );
@@ -182,7 +181,7 @@ class Post {
 	 *
 	 * @return string the object-type
 	 */
-	public function get_object_type() {
+	public function generate_object_type() {
 		if ( 'wordpress-post-format' !== \get_option( 'activitypub_object_type', 'note' ) ) {
 			return \ucfirst( \get_option( 'activitypub_object_type', 'note' ) );
 		}
@@ -248,6 +247,8 @@ class Post {
 		$content = \str_replace( '%content%', $this->get_the_post_content(), $content );
 		$content = \str_replace( '%permalink%', $this->get_the_post_link( 'permalink' ), $content );
 		$content = \str_replace( '%shortlink%', $this->get_the_post_link( 'shortlink' ), $content );
+		$content = \str_replace( '%hashtags%', $this->get_the_post_hashtags(), $content );
+		// backwards compatibility
 		$content = \str_replace( '%tags%', $this->get_the_post_hashtags(), $content );
 
 		$content = \trim( \preg_replace( '/[\r\n]{2,}/', '', $content ) );
@@ -264,6 +265,14 @@ class Post {
 		return $decoded_content;
 	}
 
+	public function generate_the_title() {
+		if ( 'Article' === $this->generate_object_type() ) {
+			$title = \generate_the_title( $this->post );
+			return \html_entity_decode( $title, \ENT_QUOTES, 'UTF-8' );
+		}
+		return null;
+	}
+
 	public function get_post_content_template() {
 		if ( 'excerpt' === \get_option( 'activitypub_post_content_type', 'content' ) ) {
 			return "%excerpt%\n\n<p>%permalink%</p>";
@@ -274,7 +283,7 @@ class Post {
 		}
 
 		if ( 'content' === \get_option( 'activitypub_post_content_type', 'content' ) ) {
-			return "%content%\n\n<p>%tags%</p>\n\n<p>%permalink%</p>";
+			return "%content%\n\n<p>%hashtags%</p>\n\n<p>%permalink%</p>";
 		}
 
 		return \get_option( 'activitypub_custom_post_content', ACTIVITYPUB_CUSTOM_POST_CONTENT );
