@@ -267,7 +267,7 @@ class Post {
 
 	public function generate_the_title() {
 		if ( 'Article' === $this->generate_object_type() ) {
-			$title = \generate_the_title( $this->post );
+			$title = $this->post->post_title;
 			return \html_entity_decode( $title, \ENT_QUOTES, 'UTF-8' );
 		}
 		return null;
