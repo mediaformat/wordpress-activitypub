@@ -67,12 +67,7 @@ class Followers {
 
 	public static function remove_follower( $actor, $author_id ) {
 		$followers = \get_user_option( 'activitypub_followers', $author_id );
-		\error_log('author_id: ' . print_r( $author_id, true ) );
-		\error_log('actor: ' . print_r( $actor, true ) );
-		\error_log('followers_array: ' . print_r( $followers, true ) );
 		foreach ( $followers as $key => $value ) {
-			\error_log('value: ' . print_r( $value, true ) );
-			\error_log('key: ' . print_r( $key, true ) );
 			if ( $value === $actor ) {
 				unset( $followers[ $key ] );
 			}

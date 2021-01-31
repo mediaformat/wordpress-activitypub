@@ -14,8 +14,8 @@ class Activity {
 	private $id = '';
 	private $type = 'Create';
 	private $actor = '';
-	private $to = array( 'https://www.w3.org/ns/activitystreams#Public' );
-	private $cc = array( 'https://www.w3.org/ns/activitystreams#Public' );
+	private $to = array( '' ); // 'https://www.w3.org/ns/activitystreams#Public'
+	private $cc = array( '' ); // 'https://www.w3.org/ns/activitystreams#Public'
 	private $object = null;
 
 	const TYPE_SIMPLE = 'simple';
@@ -58,6 +58,7 @@ class Activity {
 		if ( isset( $object['id'] ) ) {
 			$this->id = $object['id'];
 		}
+		$this->cc = $object['cc'];
 	}
 
 	public function from_comment( $object ) {

@@ -66,6 +66,7 @@ function forward_remote_post( $url, $body, $user_id ) {
 		'headers' => array(
 			'Accept' => 'application/activity+json',
 			'Content-Type' => 'application/activity+json',
+			'Digest' => "SHA-256=$digest",
 			'Signature' => $signature,
 			'Date' => $date,
 		),
@@ -383,7 +384,7 @@ function get_recipients( $object_id, $post = null ) {
 	$tagged_users_name = null;
 	if ( $post ) {
 		//post
-		$ap_object = \unserialize( \get_post_meta( $object_id, '_ap_object' ) );
+		$ap_object = \unserialize( \get_post_meta( $object_id, 'ap_object', true ) );
 	} else {
 		//comment
 		$ap_object = \unserialize( \get_comment_meta( $object_id, 'ap_object', true ) );

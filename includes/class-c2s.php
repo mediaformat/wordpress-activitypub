@@ -11,9 +11,9 @@ class C2S {
 	 * Initialize the class, registering WordPress hooks
 	 */
 	public static function init() {
-		\add_filter( 'manage_activitypub_posts_columns', array( '\Activitypub\C2S', 'activitypub_posts_columns' ), 10 );
-		\add_filter( 'manage_activitypub_posts_sortable_columns', array( '\Activitypub\C2S', 'activitypub_posts_sortable_columns' ), 10 );
-		\add_filter( 'manage_activitypub_posts_custom_column', array( '\Activitypub\C2S', 'activitypub_posts_custom_columns' ), 20, 2 );
+		\add_filter( 'manage_mention_posts_columns', array( '\Activitypub\C2S', 'activitypub_posts_columns' ), 10 );
+		\add_filter( 'manage_mention_posts_sortable_columns', array( '\Activitypub\C2S', 'activitypub_posts_sortable_columns' ), 10 );
+		\add_filter( 'manage_mention_posts_custom_column', array( '\Activitypub\C2S', 'activitypub_posts_custom_columns' ), 20, 2 );
 		\add_filter( 'page_row_actions', array( '\Activitypub\C2S', 'activitypub_post_row_actions' ), 10, 2 );
 		\add_action( 'load-edit.php', array( '\Activitypub\C2S', 'activitypub_post_actions') );
 		\add_filter( 'wp_revisions_to_keep', array( '\Activitypub\C2S', 'activitypub_inbox_revisions' ), 10, 2 );
@@ -21,10 +21,7 @@ class C2S {
 		\add_action( 'admin_enqueue_scripts', array( '\Activitypub\C2S', 'scripts_reply_comments' ), 10, 2 );
 		\add_filter( 'comment_row_actions', array( '\Activitypub\C2S', 'reply_comments_actions' ), 10, 2 );
 
-		\add_action( 'add_meta_boxes', array( '\Activitypub\C2S', 'add_audience_metabox') );
-		\add_action( 'save_post_activitypub', array( '\Activitypub\C2S', 'save_post_audience' ) );
-		\add_action( 'comment_form_logged_in_after', array( '\Activitypub\C2S', 'post_audience_html' ) );
-	//	\add_filter( 'comments_clauses', array( '\Activitypub\C2S', 'filter_private_comments'), 10, 2 );
+		\add_action( 'post_submitbox_misc_actions', array( '\Activitypub\C2S', 'post_audience_html') );
 	}
 
 	public static function activitypub_inbox_revisions ( $num,  $post ) {
@@ -41,19 +38,20 @@ class C2S {
 				$status = \get_post_field( 'post_status', $post_id, 'display' ); 
 				$author_meta = \get_post_meta( $post_id );
 				if ( $status === 'inbox' || $status === 'moderation' ) {
-					$author = $author_meta['_author'][0];
-					$author_url = $author_meta['_author_url'][0];
-					$avatar_url = $author_meta['_avatar_url'][0];
+					$author = $author_meta['author'][0];
+					$author_url = $author_meta['author_url'][0];
+					$avatar_url = $author_meta['avatar_url'][0];
 					$webfinger = \Activitypub\url_to_webfinger( $author_url );
-					echo "<strong><img src='$avatar_url' class='avatar avatar-32 photo' width='32' height='32' loading='lazy'>$author</strong><br><a href='$author_url'>$author_url</a>";
+					echo "<div><img src='$avatar_url' class='avatar avatar-32 photo' width='32' height='32' loading='lazy'><strong>$author</strong><br><a href='$author_url'>$webfinger</a></div>";
 				} else {
 					$author_url = \get_author_posts_url( $user->ID );
-					echo "<strong>" . get_avatar( $user->ID, 32 ) . $user->display_name . "</strong><br><a href='$author_url'>$author_url</a>";
+					$webfinger = \Activitypub\url_to_webfinger( $author_url );
+					echo "<div>" . get_avatar( $user->ID, 32 ) . "<strong>" . $user->display_name . "</strong><br><a href='$author_url'>$webfinger</a>";
 				}
 				break;
 
 			case 'type':
-				$audience = \get_post_meta( $post_id, '_audience', true );
+				$audience = \get_post_meta( $post_id, 'audience', true );
 				if ( !empty( $audience ) ) {
 					echo $audience;
 				} else {
@@ -99,23 +97,24 @@ class C2S {
 				$trash = $actions['trash'];
 
 				// Get post attributes for Reply & Quick reply
-				$mentions = \Activitypub\get_recipients( $post->post_ID, true );
-				$summary = \Activitypub\get_summary( $post->post_ID );
-
+				$mention = \Activitypub\get_recipients( $post->ID, 1 );
+				$summary = \Activitypub\get_summary( $post->ID );
+				$audience = \get_post_meta( $post->ID, 'audience', true );
 				// Reply to this post
-				$reply_url = admin_url( 'post-new.php?post_type=mention&post_parent=' . $post->ID . '&_mentions=' . $mentions .'&title=' . $summary );
+				$reply_url = admin_url( 'post-new.php?post_type=mention&post_parent=' . $post->ID . '&mention=' . $mention .'&title=' . $summary . '&audience=' . $audience );
 				$reply_link = add_query_arg( array( 'action' => 'reply' ), $reply_url );
 				$actions = array(
 					'reply' => sprintf( '<a href="%1$s">%2$s</a>',
 					esc_url( $reply_link ),
 					esc_html( __( 'Reply', 'activitypub' ) ) )
 				);
-
+				$author_meta = \get_post_meta( $post->ID );
+				
 				// Quick Reply to this mention
 				/*$reply_format = '<button type="button" data-post-id="%d" data-action="%s" class="%s button-link" aria-expanded="false" aria-label="%s" data-recipients="%s" data-summary="%s">%s</button>';
 				$actions['inline hide-if-no-js'] = sprintf(
 					$reply_format,
-					$post->post_ID,
+					$post->ID,
 					'replyto',
 					'postinline',
 					esc_attr__( 'Reply to this mention' ),
@@ -176,7 +175,7 @@ class C2S {
 					$u_post_id = wp_update_post($update_post);
 					if( is_wp_error( $u_post_id ) ) {
 						error_log( $u_post_id );
-						//wp_send_json_success( array( 'post_id' => $u_post_id ), 200 );
+						wp_send_json_error( array( 'post_id' => $u_post_id ), 200 );
 					} 
 				}
 				// Block actor
@@ -256,42 +255,31 @@ class C2S {
 	}
 
 	/**
-	 * Save Audience and Mentions Meta Fields
-	 * save_post_activitypub
-	 */
-    public static function save_post_audience( $post_id ) {
-		//wp_verify_nonce('ap_audience_meta');
-        //     update_post_meta(
-        //         $post_id,
-        //     );
-		// }
-		// }
-	}
-
-	/**
 	 * Audience fields 
 	 * 
 	 */
-    public static function post_audience_html($post)
-    {
+    public static function post_audience_html( $post ) {
+		?><div class="misc-pub-section misc-pub-activitypub"><?php
 		wp_nonce_field( 'ap_audience_meta', 'ap_audience_meta_nonce' );
-		$audience = $mentions = null;
+		$post_parent = $audience = $mention = null;
 		if ( isset ( $post->ID ) ) {
-			$audience = get_post_meta($post->ID, '_audience', true);
-			$mentions = get_post_meta($post->ID, '_mentions', true);
-//			$replyto = get_post_meta( $post->ID, '_inreplyto', true);
+			$audience = get_post_meta( $post->ID, 'audience', true );
+			$mention = get_post_meta( $post->ID, 'mention', true );
+			$replyto = get_post_meta( $post->ID, 'inreplyto', true );
+			$ap_object = get_post_meta( $post->ID, 'ap_object', true );
 			if ( isset( $post->post_parent ) ){
-				$replyto = $post_parent = $post->post_parent;
+				$post_parent = $post->post_parent;
 			}
 		}
-		if (array_key_exists('_audience', $_REQUEST)) {
-			$audience = $_REQUEST['_audience'];
+		if (array_key_exists('audience', $_REQUEST)) {
+			$audience = $_REQUEST['audience'];
 		}
-		if (array_key_exists('_mentions', $_REQUEST)) {
-            $mentions = $_REQUEST['_mentions'];
+		if (array_key_exists('mention', $_REQUEST)) {
+            $mention = $_REQUEST['mention'];
 		}
-		// 	$replyto = get_post_meta( $post_parent, '_source_url', true);
-		// }
+		if (array_key_exists('inreplyto', $_REQUEST)) {
+			$replyto = $_REQUEST['inreplyto'];
+		}
 		if (array_key_exists('post_parent', $_REQUEST)) {
 			$post_parent = $replyto = $_REQUEST['post_parent'];
         }
@@ -318,24 +306,24 @@ class C2S {
 		//add webfinger lookup function ajax/rest
 		?>
 		<div class="input-text-wrap" id="mentions-wrap">
-			<label for="_mentions">
-				<?php _e( 'Mention user by webfinger', 'activitypub' ); ?>
+			<label for="mention">
+				<?php _e( 'Mention users by webfinger', 'activitypub' ); ?>
 			</label>
-			<input type="text" id="mentions" name="_mentions" placeholder="<?php echo '@gilgamesh@example.social'; //$user_webfinger; ?>" value="<?php echo esc_attr( $mentions ); ?>" />
+			<input type="text" id="mention" name="mention" placeholder="<?php echo '@alice@example.social'; //$user_webfinger; ?>" value="<?php echo esc_attr( $mention ); ?>" />
 		</div>
-		<!-- <div class="input-text-wrap" id="replyto-wrap">
-			<label for="_inreplyto">
-				<?php //_e( 'In reply to', 'activitypub' ); ?>
+		<div class="input-text-wrap" id="replyto-wrap">
+			<label for="inreplyto">
+				<?php _e( 'In reply to', 'activitypub' ); ?>
 			</label>
-			<input type="text" id="inreplyto" name="_inreplyto" placeholder="<?php //echo 'https://example.com/@alice/hello-world'; ?>" value="<?php //echo esc_attr( $replyto ); ?>" />
-		</div> -->
-		<div class="select-wrap" id="aundience-wrap">
-			<label for="_audience"><?php _e('Post audience', 'activitypub' ); ?></label>
-			<select name="_audience" id="audience" class="postbox">
-				<option value="pubilc" <?php selected($audience, 'public'); ?>><?php _e('Public', 'activitypub' ); ?></option>
-				<option value="unlisted" <?php selected($audience, 'unlisted'); ?>><?php _e('Unlisted', 'activitypub' ); ?></option>
-				<option value="followers_only" <?php selected($audience, 'followers_only'); ?>><?php _e('Followers only', 'activitypub' ); ?></option>
-				<option value="private" <?php selected($audience, 'private'); ?>><?php _e('Private', 'activitypub' ); ?></option>
+			<input type="text" id="inreplyto" name="inreplyto" placeholder="<?php echo 'https://example.social/@alice/status/hello-world'; ?>" value="<?php echo $replyto; ?>" />
+		</div> 
+		<div class="select-wrap" id="audience-wrap">
+			<label for="audience"><?php _e('Post audience', 'activitypub' ); ?></label>
+			<select name="audience" id="audience" class="postbox">
+				<option value="pubilc" <?php selected( $audience, 'public' ); ?>><?php _e( 'Public', 'activitypub' ); ?></option>
+				<option value="unlisted" <?php selected( $audience, 'unlisted' ); ?>><?php _e( 'Unlisted', 'activitypub' ); ?></option>
+				<option value="followers_only" <?php selected( $audience, 'followers_only' ); ?>><?php _e( 'Followers only', 'activitypub' ); ?></option>
+				<option value="private" <?php selected( $audience, 'private' ); ?>><?php _e( 'Private', 'activitypub' ); ?></option>
 			</select>
 		</div>
 		<input type="hidden" name="post_parent" value="<?php echo $post_parent; ?>" />
@@ -368,43 +356,7 @@ class C2S {
 			<label for="content"><?php _e( 'Content' ); ?></label>
 			<textarea name="content" id="content" placeholder="<?php esc_attr_e( 'What&#8217;s on your mind?' ); ?>" class="mceEditor" rows="3" cols="15" autocomplete="off"></textarea>
 		</div>
-		<?php
+	</div><?php
 	} 
 	
 }
-/*
-
-https://developer.wordpress.org/reference/functions/wp_comment_reply/
-
-https://wordpress.stackexchange.com/questions/97553/adding-another-state-spam-reject-approve-to-wordpress-comments/97689#97689
-
-https://shibashake.com/wordpress-theme/expand-the-wordpress-comments-quick-edit-menu
-
-https://codepixelz.com/wordpress-101/wordpress-ajax-form/
-
-https://www.smashingmagazine.com/2012/05/adding-custom-fields-in-wordpress-comment-form/
-
-
-https://artisansweb.net/how-to-customize-comment-form-in-wordpress/
-// Add phone number field
-
-    function add_review_phone_field_on_comment_form() {
-        echo '<p class="comment-form-phone uk-margin-top"><label for="phone">' . __( 'Phone', 'text-domain' ) . '</label><span class="required">*</span><input class="uk-input uk-width-large uk-display-block" type="text" name="phone" id="phone"/></p>';
-    }
-    add_action( 'comment_form_logged_in_after', 'add_review_phone_field_on_comment_form' );
-    add_action( 'comment_form_after_fields', 'add_review_phone_field_on_comment_form' );
-
-
-    // Save phone number
-    add_action( 'comment_post', 'save_comment_review_phone_field' );
-    function save_comment_review_phone_field( $comment_id ){
-        if( isset( $_POST['phone'] ) )
-          update_comment_meta( $comment_id, 'phone', esc_attr( $_POST['phone'] ) );
-    }
-
-    function print_review_phone( $id ) {
-        $val = get_comment_meta( $id, "phone", true );
-        $title = $val ? '<strong class="review-phone">' . $val . '</strong>' : '';
-        return $title;
-	}
-	*/

@@ -110,10 +110,17 @@ class Activitypub {
 	public static function private_inbox( $query ) {
 		//TODO can the wp_post_count be updated? https://wordpress.stackexchange.com/a/151876/87622
 		if( is_admin() && $query->is_main_query() ) {
-			if ( $query->query['post_type'] === 'activitypub' ) {
+			
+			if ( $query->query['post_type'] === 'mention' ) {
 				
 				// Only show posts to their author
 				$query->set( 'author', \get_current_user_id() );
+				
+				// Set default order 
+				if ( $query->query['orderby'] === 'menu_order title' ) {
+					$query->set('orderby','date');
+					$query->set('order','desc');
+				}
 				
 				// Hide reported posts from all_posts list 
 				if ( empty( $query->query['post_status'] ) ) {
@@ -126,18 +133,6 @@ class Activitypub {
 					$query->set( 'author', '' );
 				}
 
-				// TODO orderby date desc
-				// Orderby
-				$orderby = $query->get( 'orderby');
- 
-				// if( 'author' == $orderby ) {
-				// 	$query->set('meta_key','author');
-				// 	$query->set('orderby','meta_value');
-				// }
-				// if( 'type' == $orderby ) {
-				// 	$query->set('meta_key','type');
-				// 	$query->set('orderby','meta_value');
-				// }
 			}
 		}
 
@@ -158,6 +153,14 @@ class Activitypub {
 		$audience = \get_post_meta( $post_id, '_audience' );
 		if ( in_array( 'private', $audience ) || in_array( 'followers_only', $audience ) ) {
 			$status = 'private';
+		if ( $status == 'publish') {
+			$audience = \get_post_meta( $post_id, 'audience' );
+			if ( in_array( 'followers_only', $audience ) ) {
+				$status = 'followers_only';
+			}
+			if ( in_array( 'private', $audience ) ) {
+				$status = 'private';
+			}
 		}
 		return $status;
 	}
@@ -219,12 +222,14 @@ class Activitypub {
 		if ( $new_status === 'inbox' || $new_status === 'moderation' ) {
 			return;
 		}
-		$audience = \get_post_meta( $post->ID, '_audience' );
+		$audience = \get_post_meta( $post->ID, 'audience' );
 		$activitypub_post = new \Activitypub\Model\Post( $post );
 		
 		if ( 'publish' === $new_status && $new_status !== $old_status ) {
-			if ( in_array( 'private', $audience ) || in_array( 'followers_only', $audience ) ) {
-				//\wp_schedule_single_event( \time(), 'activitypub_send_private_activity', array( $activitypub_post ) );
+			if ( in_array( 'private', $audience ) ) {
+				\wp_schedule_single_event( \time(), 'activitypub_send_private_activity', array( $activitypub_post ) );
+			} elseif ( in_array( 'followers_only', $audience ) ) {
+				\wp_schedule_single_event( \time(), 'activitypub_send_followers_only_activity', array( $activitypub_post ) );
 			} else {
 				\wp_schedule_single_event( \time(), 'activitypub_send_post_activity', array( $activitypub_post ) );
 			}

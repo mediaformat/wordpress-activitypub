@@ -10,6 +10,8 @@ class Post {
 	private $post;
 	private $post_author;
 	private $id;
+	private $to;
+	private $cc;
 	private $summary;
 	private $content;
 	private $attachments;
@@ -21,11 +23,15 @@ class Post {
 
 		$this->post_author = $this->post->post_author;
 		$this->id          = $this->generate_id();
+		$this->to			= $this->generate_to();
+		$this->cc			= $this->generate_cc();
 		$this->summary     = $this->generate_the_title();
 		$this->content     = $this->generate_the_content();
 		$this->attachments = $this->generate_attachments();
 		$this->tags        = $this->generate_tags();
 		$this->object_type = $this->generate_object_type();
+		$this->audience 	= $this->get_audience();
+		$this->inreplyto 		= $this->get_replyto();
 	}
 
 	public function get_post() {
@@ -44,16 +50,16 @@ class Post {
 			'type' => $this->object_type,
 			'published' => \date( 'Y-m-d\TH:i:s\Z', \strtotime( $post->post_date_gmt ) ),
 			'attributedTo' => \get_author_posts_url( $post->post_author ),
-			'summary' => $this->get_the_title(),
-			'inReplyTo' => null,
-			'content' => $this->get_the_content(),
+			'summary' => $this->summary,
+			'inReplyTo' => $this->inreplyto,
+			'content' => $this->content,
 			'contentMap' => array(
-				\strstr( \get_locale(), '_', true ) => $this->get_the_content(),
+				\strstr( \get_locale(), '_', true ) => $this->content,
 			),
-			'to' => array( 'https://www.w3.org/ns/activitystreams#Public' ),
-			'cc' => array( 'https://www.w3.org/ns/activitystreams#Public' ),
-			'attachment' => $this->get_attachments(),
-			'tag' => $this->get_tags(),
+			'to' => $this->to,
+			'cc' => $this->cc,
+			'attachment' => $this->attachments,
+			'tag' => $this->tags,
 			'replies' => array( 
 				'id' => \get_rest_url(null, 'activitypub/1.0/post/') . $post->ID . '/replies',
 				'type' => 'Collection',
@@ -156,7 +162,9 @@ class Post {
 			}
 		}
 
-		$mention_tags = \get_post_meta( $this->post->ID, '_mentions' );
+		$mentions_str = \get_post_meta( $this->post->ID, 'mention', true ); //mention field
+		$mention_array = \Activitypub\transform_tags( $mentions_str );
+		$mention_tags = $mention_array['mentions'];
 		if ( !empty( $mention_tags ) ) {
 			foreach ($mention_tags as $mention) {
 				if ( !empty( $mention ) ) {
@@ -240,6 +248,10 @@ class Post {
 
 	public function generate_the_content() {
 		$post = $this->post;
+		$audience = \get_post_meta( $post->ID, 'audience', true ); 
+		if ( 'private' === $audience || 'followers_only' === $audience ) {
+			return \html_entity_decode( $this->get_the_post_content(), \ENT_QUOTES, 'UTF-8' );
+		}
 		$content = $this->get_post_content_template();
 
 		$content = \str_replace( '%title%', \get_the_title( $post->ID ), $content );
@@ -271,6 +283,56 @@ class Post {
 			return \html_entity_decode( $title, \ENT_QUOTES, 'UTF-8' );
 		}
 		return null;
+	}
+
+	public function get_audience() {
+		$audience = \get_post_meta( $this->post->ID, 'audience', true );
+		if ( !empty( $audience ) ) {
+			return $audience;
+		} else {
+			return null;
+		}
+	}
+
+	public function get_replyto() {
+		$inreplyto = \get_post_meta( $this->post->ID, 'inreplyto', true );
+		if ( !empty( $inreplyto ) ) {
+			if ( \esc_url_raw( $inreplyto ) === $inreplyto ) {
+				return $inreplyto;
+			} else {
+				return \get_post_meta( $inreplyto, 'source_url', true );
+			}
+		} elseif( $this->post->post_parent ) {
+			$source_url = \get_post_meta( $this->post->post_parent, 'source_url', true );
+			return $source_url;
+		} else {
+			return null;
+		}
+	}
+
+	public function generate_to() {
+		$audience = \get_post_meta( $this->post->ID, 'audience', true );
+		if ( $audience == 'public' ) {
+			return array( 'https://www.w3.org/ns/activitystreams#Public' );
+		} 
+	}
+
+	public function generate_cc() {
+		$audience = \get_post_meta( $this->post->ID, 'audience', true );
+		if ( $audience == 'public' || $audience == 'unlisted' ) {
+			return array( 'https://www.w3.org/ns/activitystreams#Public' );
+		} else {
+			$mentions = \get_post_meta( $this->post->ID, 'mention', true );
+			$cc_recipients = null;
+			if ( !empty( $mentions ) ) {
+				$mentions = explode(' ', $mentions);
+				foreach ( $mentions as $mention ) {
+					$ap_profile = \Activitypub\Rest\Webfinger::webfinger_lookup( $mention );
+					$cc_recipients[] = $ap_profile['href'];
+				}
+			} 
+			return $cc_recipients;
+		}
 	}
 
 	public function get_post_content_template() {

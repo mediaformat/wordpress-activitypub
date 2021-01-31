@@ -14,6 +14,8 @@ class Activity_Dispatcher {
 	 */
 	public static function init() {
 		\add_action( 'activitypub_send_post_activity', array( '\Activitypub\Activity_Dispatcher', 'send_post_activity' ) );
+		\add_action( 'activitypub_send_private_activity', array( '\Activitypub\Activity_Dispatcher', 'send_private_activity' ) );
+		\add_action( 'activitypub_send_followers_only_activity', array( '\Activitypub\Activity_Dispatcher', 'send_followers_only_activity' ) );
 		\add_action( 'activitypub_send_update_activity', array( '\Activitypub\Activity_Dispatcher', 'send_update_activity' ) );
 		\add_action( 'activitypub_send_delete_activity', array( '\Activitypub\Activity_Dispatcher', 'send_delete_activity' ) );
 		\add_action( 'activitypub_send_comment_activity', array( '\Activitypub\Activity_Dispatcher', 'send_comment_activity' ) );
@@ -41,13 +43,82 @@ class Activity_Dispatcher {
 	}
 
 	/**
+	 * Send "private" activities.
+	 *
+	 * @param \Activitypub\Model\Post $activitypub_post
+	 */
+	public static function send_private_activity( $activitypub_post ) {
+		// get latest version of post
+		$user_id = $activitypub_post->get_post_author();
+
+		$mentions = $activitypub_post->generate_tags();
+		$recipients = array();
+		if ( !empty( $mentions ) ) {
+			foreach ($mentions as $mention) {
+				$recipients[] = $mention['href'];
+			}
+		} 
+		$activitypub_activity = new \Activitypub\Model\Activity( 'Create', \Activitypub\Model\Activity::TYPE_FULL );
+		$activitypub_activity->from_post( $activitypub_post->to_array() );
+
+		foreach ( $recipients as $to ) {
+			$inbox = \Activitypub\get_inbox_by_actor( $to );
+			$activitypub_activity->set_to( $to );
+			$activity = $activitypub_activity->to_json(); // phpcs:ignore
+			\Activitypub\safe_remote_post( $inbox, $activity, $user_id );
+		}
+	}
+
+	/**
+	 * Send "followers_only" activities.
+	 *
+	 * @param \Activitypub\Model\Post $activitypub_post
+	 */
+	public static function send_followers_only_activity( $activitypub_post ) {
+		// get latest version of post
+		$user_id = $activitypub_post->get_post_author();
+		
+		$audience = $activitypub_post->get_audience();
+		$mentions = $activitypub_post->generate_tags();
+		
+		if ( !empty( $mentions ) ) {
+			foreach ($mentions as $mention) {
+				$recipients[] = $mention['href'];
+			}
+		} 
+
+		$activitypub_activity = new \Activitypub\Model\Activity( 'Create', \Activitypub\Model\Activity::TYPE_FULL );
+		$activitypub_activity->from_post( $activitypub_post->to_array() );
+
+		// Tagged users
+		foreach ( $recipients as $to ) {
+			$inbox = \Activitypub\get_inbox_by_actor( $to );
+
+			$activitypub_activity->set_to( $to );
+			$activity = $activitypub_activity->to_json(); // phpcs:ignore
+			\Activitypub\safe_remote_post( $inbox, $activity, $user_id );
+		}
+		// Followers
+		foreach ( \Activitypub\get_follower_inboxes( $user_id ) as $inbox => $to ) {
+			if( in_array( $to, $recipients ) || ( $recipients == $to ) ) {
+				break;
+			}
+
+			$activitypub_activity->set_to( $to );
+			$activity = $activitypub_activity->to_json(); // phpcs:ignore
+			\Activitypub\safe_remote_post( $inbox, $activity, $user_id );
+		}
+		
+	}
+
+	/**
 	 * Send "update" activities.
 	 *
 	 * @param \Activitypub\Model\Post $activitypub_post
 	 */
 	public static function send_update_activity( $activitypub_post ) {
 		// get latest version of post
-		$user_id = $activitypub_post->post_author;
+		$user_id = $activitypub_post->get_post_author();
 
 		$activitypub_activity = new \Activitypub\Model\Activity( 'Update', \Activitypub\Model\Activity::TYPE_FULL );
 		$activitypub_activity->from_post( $activitypub_post->to_array() );
@@ -56,7 +127,7 @@ class Activity_Dispatcher {
 			$activitypub_activity->set_to( $to );
 			$activity = $activitypub_activity->to_json(); // phpcs:ignore
 
-			\Activitypub\safe_remote_post( $inbox, $activity, $user_id );
+			//\Activitypub\safe_remote_post( $inbox, $activity, $user_id );
 		}
 	}
 
@@ -67,7 +138,7 @@ class Activity_Dispatcher {
 	 */
 	public static function send_delete_activity( $activitypub_post ) {
 		// get latest version of post
-		$user_id = $activitypub_post->post_author;
+		$user_id = $activitypub_post->get_post_author();
 
 		$activitypub_activity = new \Activitypub\Model\Activity( 'Delete', \Activitypub\Model\Activity::TYPE_FULL );
 		$activitypub_activity->from_post( $activitypub_post->to_array() );

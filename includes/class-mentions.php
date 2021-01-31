@@ -68,15 +68,15 @@ class Mentions {
 			'supports' => array(
 				'title',
 				'editor',
-				//'thumbnail',
-				//'comments',
-				//'trackbacks',
+				'post-formats',
+				//'page-attributes',
 				array(
 					'post_status' => 'inbox',
-				)
+				),
+				//'comments',//for public coments? or no that complicates things?
 			),
 			'hierarchical' => true,//allows thread like comments
-			'has_archive' => false,
+			'has_archive' => true,
 			'rewrite' => false,
 			//'query_var' => false,
 			'delete_with_user' => true,//delete all personal posts

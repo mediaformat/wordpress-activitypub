@@ -99,7 +99,6 @@ class Inbox {
 	public static function user_inbox( $request ) {
 		$user_id = $request->get_param( 'user_id' );
 
-//		error_log( 'user_inbox $request: ' . print_r( $request, true ) );
 		$data = $request->get_params();
 		$type = $request->get_param( 'type' );
 
@@ -472,8 +471,11 @@ class Inbox {
 				'comment_author_email' => '',
 				'comment_parent' => $object_parent_ID,
 				'comment_meta' => array(
-					'inReplyTo' => \esc_url_raw( $object['object']['inReplyTo'] ),//needed? (if replying to someone else on thread, but not received)non-wp status - comment_post_ID, object_parent
+					'audience' => $audience,
+					'inreplyto' => \esc_url_raw( $object['object']['inReplyTo'] ),//needed? (if replying to someone else on thread, but not received)non-wp status - comment_post_ID, object_parent
 					'source_url' => $source_url,
+					'avatar_url' 	=> $avatar_url,
+					'ap_object' => \serialize( $object ),
 					'protocol' => 'activitypub',
 				),
 			);
