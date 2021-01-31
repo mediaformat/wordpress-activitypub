@@ -150,9 +150,6 @@ class Activitypub {
 	 * @param string $status
 	 */
 	public static function set_post_type_status_private( $status, $post_id ) {
-		$audience = \get_post_meta( $post_id, '_audience' );
-		if ( in_array( 'private', $audience ) || in_array( 'followers_only', $audience ) ) {
-			$status = 'private';
 		if ( $status == 'publish') {
 			$audience = \get_post_meta( $post_id, 'audience' );
 			if ( in_array( 'followers_only', $audience ) ) {
