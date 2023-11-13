@@ -355,10 +355,40 @@ class Signature {
 	public static function get_signature_algorithm( $signature_block ) {
 		if ( $signature_block['algorithm'] ) {
 			switch ( $signature_block['algorithm'] ) {
-				case 'rsa-sha-512':
-					return 'sha512'; //hs2019 https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12
-				default:
+				case 'hs2019':
+					// hs2019 Algorithm: Derived from metadata associated with `keyId`
+					// https://datatracker.ietf.org/doc/html/draft-cavage-http-signatures-12
+					return self::algorithm_from_key( $signature_block['keyId'] );
+				case 'rsa-sha512':
+					return 'sha512';
+				case 'rsa-sha256':
 					return 'sha256';
+				default:
+					return null;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Derives the signature algorithm from the keyId (public key)
+	 *
+	 * @param array $key_id from the signature block
+	 *
+	 * @return string The derived signature algorithm.
+	 */
+	public static function algorithm_from_key( $key_id ) {
+		if ( \wp_http_validate_url( $key_id ) ) {
+			$public_key = self::get_remote_key( $key_id );
+			if ( ! \is_wp_error( $public_key ) ) {
+				switch( $remote_key ) {
+					case ( array_key_exists('rsa', $remote_key ) ) :
+						$algorithm = 'sha' . ( $remote_key['bits'] / 8 ); //for the moment only rsa has been found in the wild
+						break;
+					default:
+						return null;
+				}
+				return $algorithm;
 			}
 		}
 		return false;
