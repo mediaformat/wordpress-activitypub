@@ -92,7 +92,7 @@ class Test_Activitypub_Signature_Verification extends WP_UnitTestCase {
 		// generate_digest & generate_signature
 		$digest = Activitypub\Signature::generate_digest( $activity );
 		$date = gmdate( 'D, d M Y H:i:s T' );
-		$signature = Activitypub\Signature::generate_signature( 1, 'POST', $remote_actor_inbox, $date, $digest );
+		$signature = Activitypub\Signature::generate_signature( 1, 'POST', $remote_actor_inbox, $date, $digest, 'rsa-sha256' );
 
 		//  Signed headers
 		$url_parts = wp_parse_url( $remote_actor_inbox );
@@ -112,5 +112,58 @@ class Test_Activitypub_Signature_Verification extends WP_UnitTestCase {
 		$this->assertTrue( $verified );
 
 		remove_filter( 'pre_get_remote_metadata_by_actor', array( get_called_class(), 'pre_get_remote_key' ), 10, 2 );
+	}
+
+	public function test_activity_hs2019_signature() {
+		// Activity for generate_digest
+		$post = \wp_insert_post(
+			array(
+				'post_author' => 1,
+				'post_content' => 'hello world',
+			)
+		);
+		$remote_actor = \get_author_posts_url( 2 );
+		$activitypub_post = \Activitypub\Transformer\Post::transform( get_post( $post ) )->to_object();
+		$activitypub_activity = new Activitypub\Activity\Activity( 'Create' );
+		$activitypub_activity->set_type( 'Create' );
+		$activitypub_activity->set_object( $activitypub_post );
+		$activitypub_activity->add_cc( $remote_actor );
+		$activity = $activitypub_activity->to_json();
+
+		// generate_digest & generate_signature
+		$digest = Activitypub\Signature::generate_digest( $activity );
+		$date = gmdate( 'D, d M Y H:i:s T' );
+
+		$signature = Activitypub\Signature::generate_signature( 1, 'POST', $remote_actor, $date, $digest, 'hs2019' );
+
+		$this->assertRegExp( '/keyId="http:\/\/example\.org\/\?author=1#main-key",algorithm="hs2019",headers="\(request-target\) host date digest",signature="[^"]*"/', $signature );
+
+		//  Signed headers
+		$url_parts = wp_parse_url( $remote_actor );
+		$route = $url_parts['path'] . '?' . $url_parts['query'];
+		$host = $url_parts['host'];
+
+		$headers = array(
+			'digest' => array( $digest ),
+			'signature' => array( $signature ),
+			'date' => array( $date ),
+			'host' => array( $host ),
+			'(request-target)' => array( 'post ' . $route ),
+		);
+
+		// Start verification
+		// parse_signature_header, get_signed_data, get_public_key
+		$signature_block = Activitypub\Signature::parse_signature_header( $headers['signature'][0] );
+		$signed_headers = $signature_block['headers'];
+		$signed_data = Activitypub\Signature::get_signed_data( $signed_headers, $signature_block, $headers );
+		$signature_algorithm = Activitypub\Signature::get_signature_algorithm( $signature_block );
+
+		$user = Activitypub\Collection\Users::get_by_id( 1 );
+
+		$public_key = Activitypub\Signature::get_public_key_for( $user->get__id() );
+
+		// signature_verification
+		$verified = \openssl_verify( $signed_data, $signature_block['signature'], $public_key, $signature_algorithm ) > 0;
+		$this->assertTrue( $verified );
 	}
 }

@@ -184,7 +184,7 @@ class Signature {
 	 *
 	 * @return string The signature.
 	 */
-	public static function generate_signature( $user_id, $http_method, $url, $date, $digest = null ) {
+	public static function generate_signature( $user_id, $http_method, $url, $date, $digest = null, $algorithm = 'rsa-sha256' ) {
 		$user = Users::get_by_id( $user_id );
 		$key  = self::get_private_key_for( $user->get__id() );
 
@@ -211,16 +211,21 @@ class Signature {
 			$signed_string = "(request-target): $http_method $path\nhost: $host\ndate: $date";
 		}
 
+		if ( 'hs2019' === $algorithm ) {
+			$signature_algorithm = \OPENSSL_ALGO_SHA512;
+		} else {
+			$signature_algorithm = \OPENSSL_ALGO_SHA256;
+		}
 		$signature = null;
-		\openssl_sign( $signed_string, $signature, $key, \OPENSSL_ALGO_SHA256 );
+		\openssl_sign( $signed_string, $signature, $key, $signature_algorithm );
 		$signature = \base64_encode( $signature ); // phpcs:ignore
 
 		$key_id = $user->get_url() . '#main-key';
 
 		if ( ! empty( $digest ) ) {
-			return \sprintf( 'keyId="%s",algorithm="rsa-sha256",headers="(request-target) host date digest",signature="%s"', $key_id, $signature );
+			return \sprintf( 'keyId="%s",algorithm="%s",headers="(request-target) host date digest",signature="%s"', $key_id, $algorithm, $signature );
 		} else {
-			return \sprintf( 'keyId="%s",algorithm="rsa-sha256",headers="(request-target) host date",signature="%s"', $key_id, $signature );
+			return \sprintf( 'keyId="%s",algorithm="%s",headers="(request-target) host date",signature="%s"', $key_id, $algorithm, $signature );
 		}
 	}
 
