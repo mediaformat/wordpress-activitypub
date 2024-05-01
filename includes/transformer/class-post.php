@@ -801,6 +801,6 @@ class Post extends Base {
 	 * @return string The plain url
 	 */
 	public static function revert_embed_links( $block_content, $block ) {
-		return $block['attrs']['url'];
+		return '<p><a href="' . esc_url( $block['attrs']['url'] ) .'">' . $block['attrs']['url'] .'</a></p>';
 	}
 }
